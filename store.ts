@@ -22,8 +22,20 @@ export const DB = {
   },
 
   setUsers: async (users: User[]) => {
-    // 전체 교체는 비효율적이므로 개별 업데이트 권장
-    throw new Error('Use individual update methods instead');
+    // Bulk update - 개별 업데이트로 처리
+    for (const u of users) {
+      const { error } = await supabase.from('users').update({
+        role: u.role,
+        name: u.name,
+        login_id: u.loginId,
+        student_id: u.studentId,
+        class_id: u.classId,
+        password_hash: u.passwordHash,
+        is_first_login: u.isFirstLogin,
+        is_active: u.isActive
+      }).eq('id', u.id);
+      if (error) throw error;
+    }
   },
 
   getReflections: async (): Promise<Reflection[]> => {
@@ -46,7 +58,23 @@ export const DB = {
   },
 
   setReflections: async (data: Reflection[]) => {
-    throw new Error('Use individual update methods instead');
+    for (const r of data) {
+      const { error } = await supabase.from('reflections').upsert({
+        id: r.id,
+        student_id: r.studentId,
+        date: r.date,
+        attitude_rating: r.attitudeRating,
+        learned_content: r.learnedContent,
+        activities: r.activities,
+        collaboration: r.collaboration,
+        ai_feedback: r.aiFeedback,
+        sentiment: r.sentiment,
+        teacher_feedback: r.teacherFeedback,
+        created_at: r.createdAt,
+        updated_at: r.updatedAt
+      });
+      if (error) throw error;
+    }
   },
 
   getClasses: async (): Promise<ClassInfo[]> => {
@@ -62,7 +90,16 @@ export const DB = {
   },
 
   setClasses: async (data: ClassInfo[]) => {
-    throw new Error('Use individual update methods instead');
+    for (const c of data) {
+      const { error } = await supabase.from('classes').upsert({
+        id: c.id,
+        name: c.name,
+        year: c.year,
+        teacher_id: c.teacherId,
+        target_days: c.targetDays
+      });
+      if (error) throw error;
+    }
   },
 
   getAnalyses: async (): Promise<Record<string, any>> => {

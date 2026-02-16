@@ -1,3 +1,13 @@
+-- Classes 테이블 (먼저 생성)
+CREATE TABLE classes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  year TEXT NOT NULL,
+  teacher_id UUID,
+  target_days INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Users 테이블
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -12,15 +22,8 @@ CREATE TABLE users (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Classes 테이블
-CREATE TABLE classes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  year TEXT NOT NULL,
-  teacher_id UUID REFERENCES users(id),
-  target_days INTEGER NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- 외래 키 추가
+ALTER TABLE classes ADD CONSTRAINT fk_teacher FOREIGN KEY (teacher_id) REFERENCES users(id);
 
 -- Reflections 테이블
 CREATE TABLE reflections (
