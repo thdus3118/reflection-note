@@ -163,7 +163,7 @@ export const DB = {
 
   upsertStudent: async (studentData: Partial<User>) => {
     if (!studentData.id) {
-      const { data: existing } = await supabase.from('users').select('id').eq('role', UserRole.STUDENT).eq('class_id', studentData.classId).eq('student_id', studentData.studentId).eq('is_active', true).single();
+      const { data: existing } = await supabase.from('users').select('id').eq('role', UserRole.STUDENT).eq('class_id', studentData.classId).eq('student_id', studentData.studentId).eq('is_active', true).maybeSingle();
       if (existing) throw new Error(`학번 ${studentData.studentId}이(가) 이미 존재합니다.`);
       
       const { error } = await supabase.from('users').insert({
@@ -192,7 +192,7 @@ export const DB = {
     const validStudents = [];
 
     for (const s of students) {
-      const { data: existing } = await supabase.from('users').select('id').eq('role', UserRole.STUDENT).eq('class_id', s.classId).eq('student_id', s.studentId).eq('is_active', true).single();
+      const { data: existing } = await supabase.from('users').select('id').eq('role', UserRole.STUDENT).eq('class_id', s.classId).eq('student_id', s.studentId).eq('is_active', true).maybeSingle();
       if (existing) {
         duplicates.push(s.studentId);
       } else {
