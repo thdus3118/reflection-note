@@ -43,10 +43,8 @@ export const aiService = {
       return JSON.parse(response.text.trim());
     } catch (error: any) {
       console.error("AI Feedback Error:", error);
-      if (error?.message?.includes('quota') || error?.message?.includes('limit')) {
-        return { feedback: "API 사용량 한계에 도달했습니다. 잠시 후 다시 시도해주세요.", sentiment: "neutral" };
-      }
-      return { feedback: "오늘도 수고 많았어요! 내일도 즐겁게 배워봐요.", sentiment: "neutral" };
+      // API 한계 도달 시 빈 문자열 반환 (저장은 됨)
+      return { feedback: "", sentiment: "neutral" };
     }
   },
 

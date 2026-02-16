@@ -69,9 +69,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser 
 
     try {
       const aiRes = await aiService.getEncouragingFeedback(updatedReflection);
-      updatedReflection.aiFeedback = aiRes.feedback;
-      updatedReflection.sentiment = aiRes.sentiment as any;
-    } catch (e) { console.error(e); }
+      if (aiRes.feedback && !aiRes.feedback.includes('API 사용량')) {
+        updatedReflection.aiFeedback = aiRes.feedback;
+        updatedReflection.sentiment = aiRes.sentiment as any;
+      }
+    } catch (e) { 
+      console.error(e);
+      // AI 피드백 실패해도 저장은 계속
+    }
 
     let nextAllReflections;
     if (existingIdx > -1) {
