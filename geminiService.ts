@@ -1,4 +1,4 @@
-
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Reflection } from "./types";
 
 export const aiService = {
@@ -7,6 +7,9 @@ export const aiService = {
     if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
       return { feedback: "", sentiment: "neutral" };
     }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     const prompt = `학생의 오늘 성찰 내용을 바탕으로 따뜻하고 구체적인 격려 피드백을 한글로 작성해주세요.
 성찰 내용:
@@ -18,17 +21,8 @@ export const aiService = {
 JSON 형식으로만 응답: {"feedback": "격려 메시지", "sentiment": "positive|neutral|negative"}`;
 
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      });
-
-      if (!response.ok) throw new Error('API Error');
-      const data = await response.json();
-      const text = data.candidates[0].content.parts[0].text;
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
       return JSON.parse(text.replace(/```json\n?|\n?```/g, ''));
     } catch (error: any) {
       console.error("AI Feedback Error:", error);
@@ -45,6 +39,9 @@ JSON 형식으로만 응답: {"feedback": "격려 메시지", "sentiment": "posi
         statistics: { averageRating: 0, positiveCount: 0, alertCount: 0 } 
       };
     }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     const content = reflections.map(r => `[학생:${r.studentName}] 별점:${r.attitudeRating} 내용:${r.learnedContent} 활동:${r.activities} 협동:${r.collaboration}`).join("\n");
     
@@ -78,17 +75,8 @@ JSON 형식으로만 응답:
 }`;
 
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      });
-
-      if (!response.ok) throw new Error('API Error');
-      const data = await response.json();
-      const text = data.candidates[0].content.parts[0].text;
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
       return JSON.parse(text.replace(/```json\n?|\n?```/g, ''));
     } catch (error: any) {
       console.error("AI Class Analysis Error:", error);
