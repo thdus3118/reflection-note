@@ -6,7 +6,10 @@ const SESSION_KEY = 'reflection_note_session_v2';
 
 export const DB = {
   getUsers: async (): Promise<User[]> => {
-    const { data, error } = await supabase.from('users').select('*');
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
     if (error) throw error;
     return data.map(u => ({
       id: u.id,
@@ -22,24 +25,26 @@ export const DB = {
   },
 
   setUsers: async (users: User[]) => {
-    // Bulk update - 개별 업데이트로 처리
-    for (const u of users) {
-      const { error } = await supabase.from('users').update({
-        role: u.role,
-        name: u.name,
-        login_id: u.loginId,
-        student_id: u.studentId,
-        class_id: u.classId,
-        password_hash: u.passwordHash,
-        is_first_login: u.isFirstLogin,
-        is_active: u.isActive
-      }).eq('id', u.id);
-      if (error) throw error;
-    }
+    const updates = users.map(u => ({
+      id: u.id,
+      role: u.role,
+      name: u.name,
+      login_id: u.loginId,
+      student_id: u.studentId,
+      class_id: u.classId,
+      password_hash: u.passwordHash,
+      is_first_login: u.isFirstLogin,
+      is_active: u.isActive
+    }));
+    const { error } = await supabase.from('users').upsert(updates);
+    if (error) throw error;
   },
 
   getReflections: async (): Promise<Reflection[]> => {
-    const { data, error } = await supabase.from('reflections').select('*');
+    const { data, error } = await supabase
+      .from('reflections')
+      .select('*')
+      .order('date', { ascending: false });
     if (error) throw error;
     return data.map(r => ({
       id: r.id,
@@ -58,23 +63,22 @@ export const DB = {
   },
 
   setReflections: async (data: Reflection[]) => {
-    for (const r of data) {
-      const { error } = await supabase.from('reflections').upsert({
-        id: r.id,
-        student_id: r.studentId,
-        date: r.date,
-        attitude_rating: r.attitudeRating,
-        learned_content: r.learnedContent,
-        activities: r.activities,
-        collaboration: r.collaboration,
-        ai_feedback: r.aiFeedback,
-        sentiment: r.sentiment,
-        teacher_feedback: r.teacherFeedback,
-        created_at: r.createdAt,
-        updated_at: r.updatedAt
-      });
-      if (error) throw error;
-    }
+    const records = data.map(r => ({
+      id: r.id,
+      student_id: r.studentId,
+      date: r.date,
+      attitude_rating: r.attitudeRating,
+      learned_content: r.learnedContent,
+      activities: r.activities,
+      collaboration: r.collaboration,
+      ai_feedback: r.aiFeedback,
+      sentiment: r.sentiment,
+      teacher_feedback: r.teacherFeedback,
+      created_at: r.createdAt,
+      updated_at: r.updatedAt
+    }));
+    const { error } = await supabase.from('reflections').upsert(records);
+    if (error) throw error;
   },
 
   getClasses: async (): Promise<ClassInfo[]> => {
@@ -90,16 +94,15 @@ export const DB = {
   },
 
   setClasses: async (data: ClassInfo[]) => {
-    for (const c of data) {
-      const { error } = await supabase.from('classes').upsert({
-        id: c.id,
-        name: c.name,
-        year: c.year,
-        teacher_id: c.teacherId,
-        target_days: c.targetDays
-      });
-      if (error) throw error;
-    }
+    const records = data.map(c => ({
+      id: c.id,
+      name: c.name,
+      year: c.year,
+      teacher_id: c.teacherId,
+      target_days: c.targetDays
+    }));
+    const { error } = await supabase.from('classes').upsert(records);
+    if (error) throw error;
   },
 
   getAnalyses: async (): Promise<Record<string, any>> => {
@@ -194,25 +197,36 @@ export const DB = {
 
   bulkUpsertStudents: async (students: { name: string, studentId: string, classId: string }[]) => {
     const duplicates: string[] = [];
-    const validStudents = [];
-
-    for (const s of students) {
-      const { data: existing } = await supabase.from('users').select('id').eq('role', UserRole.STUDENT).eq('class_id', s.classId).eq('student_id', s.studentId).eq('is_active', true).maybeSingle();
-      if (existing) {
-        duplicates.push(s.studentId);
-      } else {
-        validStudents.push({
-          role: UserRole.STUDENT,
-          name: s.name,
-          student_id: s.studentId,
-          login_id: '',
-          password_hash: '0000',
-          is_first_login: true,
-          is_active: true,
-          class_id: s.classId
-        });
-      }
-    }
+    const studentIds = students.map(s => s.studentId);
+    
+    const { data: existingList } = await supabase
+      .from('users')
+      .select('student_id')
+      .eq('role', UserRole.STUDENT)
+      .eq('class_id', students[0].classId)
+      .in('student_id', studentIds)
+      .eq('is_active', true);
+    
+    const existingIds = new Set(existingList?.map(e => e.student_id) || []);
+    
+    const validStudents = students
+      .filter(s => {
+        if (existingIds.has(s.studentId)) {
+          duplicates.push(s.studentId);
+          return false;
+        }
+        return true;
+      })
+      .map(s => ({
+        role: UserRole.STUDENT,
+        name: s.name,
+        student_id: s.studentId,
+        login_id: '',
+        password_hash: '0000',
+        is_first_login: true,
+        is_active: true,
+        class_id: s.classId
+      }));
 
     if (validStudents.length > 0) {
       const { error } = await supabase.from('users').insert(validStudents);
