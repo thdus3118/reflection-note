@@ -4,7 +4,11 @@ import { Reflection } from "./types";
 
 export const aiService = {
   getEncouragingFeedback: async (reflection: Reflection): Promise<{ feedback: string, sentiment: string }> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return { feedback: "오늘도 수고 많았어요! 내일도 즐겱게 배워봐요.", sentiment: "neutral" };
+    }
+    const ai = new GoogleGenAI({ apiKey });
     const prompt = `
       학생의 오늘 성찰 내용을 바탕으로 따뜻하고 구체적인 격려 피드백을 한글로 작성해주세요.
       성찰 내용:
@@ -44,7 +48,15 @@ export const aiService = {
   },
 
   analyzeClassroomIssues: async (reflections: (Reflection & { studentName: string })[]): Promise<any> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return { 
+        summary: "API 키가 설정되지 않았습니다.", 
+        detectedIssues: [], 
+        statistics: { averageRating: 0, positiveCount: 0, alertCount: 0 } 
+      };
+    }
+    const ai = new GoogleGenAI({ apiKey });
     const content = reflections.map(r => `[학생:${r.studentName}] 별점:${r.attitudeRating} 내용:${r.learnedContent} 활동:${r.activities} 협동:${r.collaboration}`).join("\n");
     
     const prompt = `
