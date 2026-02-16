@@ -20,6 +20,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<any>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>(today);
+  const [analysisHistory, setAnalysisHistory] = useState<Array<{date: string, data: any}>>([]);
   
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
   const [selectedStudent, setSelectedStudent] = useState<User | null>(null);
@@ -56,14 +58,21 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
   };
 
   useEffect(() => {
-    if (activeTab === 'analysis') {
+    if (activeTab === 'analysis' && selectedClassId !== 'all') {
       (async () => {
-        const cacheKey = `${selectedClassId}_${today}`;
-        const cached = (await DB.getAnalyses())[cacheKey];
-        setAnalysis(cached || null);
+        const allAnalyses = await DB.getAnalyses();
+        const prefix = `${selectedClassId}_`;
+        const history = Object.entries(allAnalyses)
+          .filter(([key]) => key.startsWith(prefix))
+          .map(([key, data]) => ({ date: key.replace(prefix, ''), data }))
+          .sort((a, b) => b.date.localeCompare(a.date));
+        setAnalysisHistory(history);
+        
+        const cacheKey = `${selectedClassId}_${selectedDate}`;
+        setAnalysis(allAnalyses[cacheKey] || null);
       })();
     }
-  }, [selectedClassId, activeTab]);
+  }, [selectedClassId, activeTab, selectedDate]);
 
   useEffect(() => {
     if (successMessage) {
@@ -235,20 +244,45 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
     }
   };
 
-  const runAnalysis = async () => {
+  const runAnalysis = async (targetDate: string = today) => {
     if (!hasApiKey || selectedClassId === 'all') return;
     setIsAnalyzing(true);
-    const todays = reflections
-      .filter(r => r.date === today && filteredStudents.some(s => s.id === r.studentId))
+    const targetReflections = reflections
+      .filter(r => r.date === targetDate && filteredStudents.some(s => s.id === r.studentId))
       .map(r => ({ ...r, studentName: students.find(s => s.id === r.studentId)?.name || '알 수 없음' }));
-    if (todays.length === 0) { alert("오늘 데이터가 없습니다."); setIsAnalyzing(false); return; }
+    if (targetReflections.length === 0) { alert(`${targetDate} 데이터가 없습니다."); setIsAnalyzing(false); return; }
     try {
-      const result = await aiService.analyzeClassroomIssues(todays);
-      const cacheKey = `${selectedClassId}_${today}`;
+      const result = await aiService.analyzeClassroomIssues(targetReflections);
+      const cacheKey = `${selectedClassId}_${targetDate}`;
       await DB.setAnalysis(cacheKey, result);
       setAnalysis(result);
+      setSelectedDate(targetDate);
+      const allAnalyses = await DB.getAnalyses();
+      const prefix = `${selectedClassId}_`;
+      const history = Object.entries(allAnalyses)
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, data]) => ({ date: key.replace(prefix, ''), data }))
+        .sort((a, b) => b.date.localeCompare(a.date));
+      setAnalysisHistory(history);
     } catch (err) { alert("분석 중 오류 발생"); }
     finally { setIsAnalyzing(false); }
+  };
+
+  const getWeeklyStats = () => {
+    if (analysisHistory.length === 0) return null;
+    const recent7 = analysisHistory.slice(0, 7);
+    const avgRating = recent7.reduce((sum, h) => sum + (h.data.statistics?.averageRating || 0), 0) / recent7.length;
+    const totalAlerts = recent7.reduce((sum, h) => sum + (h.data.statistics?.alertCount || 0), 0);
+    const repeatedStudents = new Map<string, number>();
+    recent7.forEach(h => {
+      h.data.detectedIssues?.forEach((issue: any) => {
+        repeatedStudents.set(issue.studentName, (repeatedStudents.get(issue.studentName) || 0) + 1);
+      });
+    });
+    const frequentIssues = Array.from(repeatedStudents.entries())
+      .filter(([_, count]) => count >= 2)
+      .sort((a, b) => b[1] - a[1]);
+    return { avgRating, totalAlerts, frequentIssues, daysAnalyzed: recent7.length };
   };
 
   if (user.isFirstLogin) {
@@ -312,17 +346,71 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
                 <button onClick={() => setActiveTab('settings')} className="bg-white text-rose-600 px-8 py-4 rounded-xl font-black text-sm">설정으로 이동</button>
              </div>
            )}
-           <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-8">
-              <div className="space-y-1">
-                <h3 className="font-black text-slate-800 text-2xl">{selectedClassId === 'all' ? '학급을 선택해주세요' : `${classes.find(c => c.id === selectedClassId)?.name} AI 가이드`}</h3>
-                <p className="text-sm text-slate-400 font-bold">학습 부진, 관계 갈등, 정서적 이상 징후를 집중적으로 분석합니다.</p>
+           <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="space-y-1">
+                  <h3 className="font-black text-slate-800 text-2xl">{selectedClassId === 'all' ? '학급을 선택해주세요' : `${classes.find(c => c.id === selectedClassId)?.name} AI 가이드`}</h3>
+                  <p className="text-sm text-slate-400 font-bold">학습 부진, 관계 갈등, 정서적 이상 징후를 집중적으로 분석합니다.</p>
+                </div>
+                <button onClick={() => runAnalysis(today)} disabled={isAnalyzing || selectedClassId === 'all' || !hasApiKey} className="bg-indigo-600 text-white px-12 py-5 rounded-2xl font-black hover:bg-indigo-700 disabled:bg-slate-200 transition-all shadow-xl shadow-indigo-100 whitespace-nowrap">
+                  {isAnalyzing ? "Gemini가 분석 중..." : "오늘의 학급 분석 시작"}
+                </button>
               </div>
-              <button onClick={runAnalysis} disabled={isAnalyzing || selectedClassId === 'all' || !hasApiKey} className="bg-indigo-600 text-white px-12 py-5 rounded-2xl font-black hover:bg-indigo-700 disabled:bg-slate-200 transition-all shadow-xl shadow-indigo-100">
-                {isAnalyzing ? "Gemini가 분석 중..." : "오늘의 학급 분석 시작"}
-              </button>
+              {analysisHistory.length > 0 && (
+                <div className="flex items-center gap-3 pt-4 border-t">
+                  <label className="text-xs font-black text-slate-400">📅 분석 이력 조회:</label>
+                  <select value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl border-none outline-none cursor-pointer">
+                    {analysisHistory.map(h => <option key={h.date} value={h.date}>{h.date} {h.date === today ? '(오늘)' : ''}</option>)}
+                  </select>
+                  <span className="text-xs text-slate-400 font-bold">총 {analysisHistory.length}일 분석됨</span>
+                </div>
+              )}
            </div>
+           {selectedClassId !== 'all' && getWeeklyStats() && (
+             <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-8 rounded-[2.5rem] border border-indigo-100 shadow-sm">
+               <h4 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">📈 최근 7일 누적 통계</h4>
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                 <div className="bg-white p-4 rounded-2xl">
+                   <div className="text-[10px] font-black text-slate-400 uppercase">평균 만족도</div>
+                   <div className="text-2xl font-black text-amber-500 mt-1">{getWeeklyStats()!.avgRating.toFixed(1)}</div>
+                 </div>
+                 <div className="bg-white p-4 rounded-2xl">
+                   <div className="text-[10px] font-black text-slate-400 uppercase">총 경고 건수</div>
+                   <div className="text-2xl font-black text-rose-500 mt-1">{getWeeklyStats()!.totalAlerts}</div>
+                 </div>
+                 <div className="bg-white p-4 rounded-2xl">
+                   <div className="text-[10px] font-black text-slate-400 uppercase">분석 일수</div>
+                   <div className="text-2xl font-black text-indigo-500 mt-1">{getWeeklyStats()!.daysAnalyzed}일</div>
+                 </div>
+                 <div className="bg-white p-4 rounded-2xl">
+                   <div className="text-[10px] font-black text-slate-400 uppercase">반복 경고 학생</div>
+                   <div className="text-2xl font-black text-purple-500 mt-1">{getWeeklyStats()!.frequentIssues.length}명</div>
+                 </div>
+               </div>
+               {getWeeklyStats()!.frequentIssues.length > 0 && (
+                 <div className="mt-4 bg-white p-6 rounded-2xl">
+                   <div className="text-xs font-black text-rose-500 mb-3">🚨 지속 관찰 필요 학생</div>
+                   <div className="flex flex-wrap gap-2">
+                     {getWeeklyStats()!.frequentIssues.map(([name, count]) => (
+                       <span key={name} className="bg-rose-50 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-black">
+                         {name} <span className="text-rose-400">({count}회)</span>
+                       </span>
+                     ))}
+                   </div>
+                 </div>
+               )}
+             </div>
+           )}
            {analysis && (
              <div className="space-y-6 animate-in slide-in-from-bottom-8">
+                <div className="flex items-center justify-between px-4">
+                  <h4 className="text-lg font-black text-slate-800">{selectedDate} 분석 결과 {selectedDate === today ? '(오늘)' : ''}</h4>
+                  {selectedDate !== today && (
+                    <button onClick={() => setSelectedDate(today)} className="text-xs font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-100">
+                      오늘 분석으로 돌아가기
+                    </button>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">평균 수업 만족도</label>
