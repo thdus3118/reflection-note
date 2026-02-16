@@ -6,7 +6,7 @@ export const aiService = {
   getEncouragingFeedback: async (reflection: Reflection): Promise<{ feedback: string, sentiment: string }> => {
     const apiKey = localStorage.getItem('GEMINI_API_KEY');
     if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
-      return { feedback: "오늘도 수고 많았어요! 내일도 즐겱게 배워봐요.", sentiment: "neutral" };
+      return { feedback: "오늘도 수고 많았어요! 내일도 즐겁게 배워봐요.", sentiment: "neutral" };
     }
     const ai = new GoogleGenAI({ apiKey });
     const prompt = `
@@ -26,7 +26,7 @@ export const aiService = {
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-pro",
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         config: {
           responseMimeType: "application/json",
@@ -41,8 +41,11 @@ export const aiService = {
         }
       });
       return JSON.parse(response.text.trim());
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI Feedback Error:", error);
+      if (error?.message?.includes('quota') || error?.message?.includes('limit')) {
+        return { feedback: "API 사용량 한계에 도달했습니다. 잠시 후 다시 시도해주세요.", sentiment: "neutral" };
+      }
       return { feedback: "오늘도 수고 많았어요! 내일도 즐겁게 배워봐요.", sentiment: "neutral" };
     }
   },
@@ -75,7 +78,7 @@ export const aiService = {
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-pro",
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         config: {
           responseMimeType: "application/json",
@@ -112,10 +115,14 @@ export const aiService = {
         }
       });
       return JSON.parse(response.text.trim());
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI Class Analysis Error:", error);
+      let errorMsg = "데이터 분석 중 오류가 발생했습니다.";
+      if (error?.message?.includes('quota') || error?.message?.includes('limit')) {
+        errorMsg = "API 사용량 한계에 도달했습니다. 잠시 후 다시 시도하거나 API 키를 확인해주세요.";
+      }
       return { 
-        summary: "데이터 분석 중 오류가 발생했습니다.", 
+        summary: errorMsg, 
         detectedIssues: [], 
         statistics: { averageRating: 0, positiveCount: 0, alertCount: 0 } 
       };
