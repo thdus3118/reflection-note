@@ -117,6 +117,11 @@ export const DB = {
     if (error) throw error;
   },
 
+  deleteAnalysis: async (key: string) => {
+    const { error } = await supabase.from('analyses').delete().eq('key', key);
+    if (error) throw error;
+  },
+
   getCurrentUser: (): User | null => JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'),
   
   setCurrentUser: (user: User | null) => {

@@ -250,6 +250,23 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
     }
   };
 
+  const handleDeleteAnalysis = async (date: string) => {
+    if (confirm(`${date} 분석 결과를 삭제하시겠습니까?`)) {
+      const cacheKey = `${selectedClassId}_${date}`;
+      await DB.deleteAnalysis(cacheKey);
+      setAnalysis(null);
+      setSelectedDate(today);
+      const allAnalyses = await DB.getAnalyses();
+      const prefix = `${selectedClassId}_`;
+      const history = Object.entries(allAnalyses)
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, data]) => ({ date: key.replace(prefix, ''), data }))
+        .sort((a, b) => b.date.localeCompare(a.date));
+      setAnalysisHistory(history);
+      setSuccessMessage("분석 결과가 삭제되었습니다.");
+    }
+  };
+
   const runAnalysis = async (targetDate: string = today) => {
     if (!hasApiKey || selectedClassId === 'all') return;
     setIsAnalyzing(true);
@@ -411,11 +428,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
              <div className="space-y-6 animate-in slide-in-from-bottom-8">
                 <div className="flex items-center justify-between px-4">
                   <h4 className="text-lg font-black text-slate-800">{selectedDate} 분석 결과 {selectedDate === today ? '(오늘)' : ''}</h4>
-                  {selectedDate !== today && (
-                    <button onClick={() => setSelectedDate(today)} className="text-xs font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-100">
-                      오늘 분석으로 돌아가기
+                  <div className="flex gap-2">
+                    {selectedDate !== today && (
+                      <button onClick={() => setSelectedDate(today)} className="text-xs font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-100">
+                        오늘 분석으로 돌아가기
+                      </button>
+                    )}
+                    <button onClick={() => handleDeleteAnalysis(selectedDate)} className="text-xs font-black text-rose-600 bg-rose-50 px-4 py-2 rounded-xl hover:bg-rose-100">
+                      삭제
                     </button>
-                  )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
