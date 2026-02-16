@@ -250,7 +250,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
     const targetReflections = reflections
       .filter(r => r.date === targetDate && filteredStudents.some(s => s.id === r.studentId))
       .map(r => ({ ...r, studentName: students.find(s => s.id === r.studentId)?.name || '알 수 없음' }));
-    if (targetReflections.length === 0) { alert(`${targetDate} 데이터가 없습니다."); setIsAnalyzing(false); return; }
+    if (targetReflections.length === 0) { alert(`${targetDate} 데이터가 없습니다.`); setIsAnalyzing(false); return; }
     try {
       const result = await aiService.analyzeClassroomIssues(targetReflections);
       const cacheKey = `${selectedClassId}_${targetDate}`;
