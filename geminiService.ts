@@ -26,7 +26,7 @@ export const aiService = {
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "models/gemini-1.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -75,7 +75,7 @@ export const aiService = {
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-pro",
+        model: "models/gemini-1.5-pro",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
