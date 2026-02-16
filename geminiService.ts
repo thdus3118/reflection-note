@@ -4,8 +4,8 @@ import { Reflection } from "./types";
 
 export const aiService = {
   getEncouragingFeedback: async (reflection: Reflection): Promise<{ feedback: string, sentiment: string }> => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    const apiKey = localStorage.getItem('GEMINI_API_KEY');
+    if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
       return { feedback: "오늘도 수고 많았어요! 내일도 즐겱게 배워봐요.", sentiment: "neutral" };
     }
     const ai = new GoogleGenAI({ apiKey });
@@ -48,8 +48,8 @@ export const aiService = {
   },
 
   analyzeClassroomIssues: async (reflections: (Reflection & { studentName: string })[]): Promise<any> => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    const apiKey = localStorage.getItem('GEMINI_API_KEY');
+    if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
       return { 
         summary: "API 키가 설정되지 않았습니다.", 
         detectedIssues: [], 

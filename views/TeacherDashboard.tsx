@@ -42,21 +42,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
   useEffect(() => { refreshData(); checkApiKey(); }, []);
 
   const checkApiKey = async () => {
-    const aistudio = (window as any).aistudio;
-    if (aistudio) {
-      const hasKey = await aistudio.hasSelectedApiKey();
-      setHasApiKey(hasKey);
-    }
+    const apiKey = localStorage.getItem('GEMINI_API_KEY');
+    setHasApiKey(!!apiKey && apiKey !== 'PLACEHOLDER_API_KEY');
   };
 
   const handleConnectApiKey = async () => {
-    const aistudio = (window as any).aistudio;
-    if (aistudio) {
-      try {
-        await aistudio.openSelectKey();
-        setHasApiKey(true);
-        setSuccessMessage("API 키가 성공적으로 연결되었습니다.");
-      } catch (err) { console.error(err); }
+    const apiKey = prompt('개인 Gemini API 키를 입력하세요:');
+    if (apiKey && apiKey.trim()) {
+      localStorage.setItem('GEMINI_API_KEY', apiKey.trim());
+      setHasApiKey(true);
+      setSuccessMessage("API 키가 성공적으로 연결되었습니다.");
     }
   };
 
