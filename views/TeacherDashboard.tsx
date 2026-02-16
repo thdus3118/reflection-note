@@ -10,6 +10,8 @@ interface TeacherDashboardProps {
 }
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser }) => {
+  const today = new Date().toISOString().split('T')[0];
+  
   const [activeTab, setActiveTab] = useState<'analysis' | 'students' | 'classes' | 'settings'>(user.isFirstLogin ? 'settings' : 'analysis');
   const [reflections, setReflections] = useState<Reflection[]>([]);
   const [students, setStudents] = useState<User[]>([]);
@@ -39,7 +41,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
   const [newTargetDays, setNewTargetDays] = useState(190);
 
   const csvFileInputRef = useRef<HTMLInputElement>(null);
-  const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => { refreshData(); checkApiKey(); }, []);
 
