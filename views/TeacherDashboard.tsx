@@ -10,7 +10,12 @@ interface TeacherDashboardProps {
 }
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser }) => {
-  const today = new Date().toISOString().split('T')[0];
+  const getKoreanDate = () => {
+    const now = new Date();
+    const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    return kst.toISOString().split('T')[0];
+  };
+  const today = getKoreanDate();
   
   const [activeTab, setActiveTab] = useState<'analysis' | 'students' | 'classes' | 'settings'>(user.isFirstLogin ? 'settings' : 'analysis');
   const [reflections, setReflections] = useState<Reflection[]>([]);

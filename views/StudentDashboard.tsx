@@ -26,6 +26,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser 
 
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
 
+  const getKoreanDate = () => {
+    const now = new Date();
+    const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    return kst.toISOString().split('T')[0];
+  };
+  const today = getKoreanDate();
+
   useEffect(() => { refreshData(); }, [user.id, user.classId]);
 
   useEffect(() => {
@@ -43,13 +50,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser 
     setClassInfo(myClass || null);
   };
 
-  const today = new Date().toISOString().split('T')[0];
   const todaysReflection = reflections.find(r => r.date === today);
   const alreadySubmitted = !!todaysReflection;
 
   const handleSubmit = async (data: any) => {
     // 자정 수정 금지 체크
-    const now = new Date().toISOString().split('T')[0];
+    const now = getKoreanDate();
     if (isEditing && todaysReflection?.date !== now) {
       alert("성찰 수정은 당일 자정까지만 가능합니다.");
       setIsEditing(false);
