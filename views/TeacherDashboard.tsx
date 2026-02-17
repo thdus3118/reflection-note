@@ -500,7 +500,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
                     <td className="p-6"><div className="font-black text-slate-700 text-lg group-hover:text-indigo-600">{s.name}</div><div className="text-[10px] text-slate-400 font-bold">{s.studentId}</div></td>
                     <td className="p-6"><span className="text-xs font-black text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">{classes.find(c => c.id === s.classId)?.name || '미지정'}</span></td>
                     <td className="p-6"><span className="text-sm font-black text-indigo-500">{reflections.filter(r => r.studentId === s.id).length}회</span></td>
-                    <td className="p-6 text-right"><button onClick={(e) => resetPassword(s.id, e)} className="text-[10px] font-black text-rose-500 bg-rose-50 px-4 py-2 rounded-xl hover:bg-rose-500 hover:text-white sm:opacity-0 group-hover:opacity-100 transition-all">비번 초기화</button></td>
+                    <td className="p-6 text-right">
+                      <div className="flex gap-2 justify-end">
+                        <button onClick={(e) => { e.stopPropagation(); resetPassword(s.id, e); }} className="text-[10px] font-black text-amber-500 bg-amber-50 px-4 py-2 rounded-xl hover:bg-amber-500 hover:text-white sm:opacity-0 group-hover:opacity-100 transition-all">비번 초기화</button>
+                        <button onClick={(e) => { e.stopPropagation(); if(confirm(`${s.name} 학생을 삭제하시겠습니까?`)) { DB.deactivateUser(s.id); refreshData(); setSuccessMessage('학생이 삭제되었습니다.'); } }} className="text-[10px] font-black text-rose-500 bg-rose-50 px-4 py-2 rounded-xl hover:bg-rose-500 hover:text-white sm:opacity-0 group-hover:opacity-100 transition-all">삭제</button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
