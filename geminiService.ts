@@ -44,19 +44,16 @@ export const aiService = {
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const prompt = `학생의 오늘 성찰 내용을 바탕으로 따뜻하고 구체적인 격려 피드백을 한글로 작성해주세요.
-성찰 내용:
-- 오늘 학습: ${reflection.learnedContent}
-- 학습 활동: ${reflection.activities}
-- 협동 과정: ${reflection.collaboration}
-- 수업 태도: ${reflection.attitudeRating}점
+    const prompt = `학생의 성찰에 대해 한 문장으로 짧고 따뜻한 격려를 해주세요.
+성찰: 학습=${reflection.learnedContent}, 활동=${reflection.activities}, 협동=${reflection.collaboration}, 태도=${reflection.attitudeRating}점
 
-JSON 형식으로만 응답: {"feedback": "격려 메시지", "sentiment": "positive|neutral|negative"}`;
+JSON으로만 응답: {"feedback": "20자 이내 격려", "sentiment": "positive|neutral|negative"}`;
 
     try {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: prompt
+        contents: prompt,
+        generationConfig: { maxOutputTokens: 50 }
       });
       return JSON.parse(response.text.replace(/```json\n?|\n?```/g, ''));
     } catch (error: any) {
