@@ -1,9 +1,43 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Reflection } from "./types";
+import { supabase } from "./supabaseClient";
+
+const getTeacherApiKey = async (classId?: string): Promise<string | null> => {
+  const currentUser = JSON.parse(localStorage.getItem('reflection_note_session_v2') || 'null');
+  if (!currentUser?.id) return null;
+  
+  // 학생인 경우: 해당 수업의 교사 API 키 사용
+  if (currentUser.role === 'STUDENT' && classId) {
+    const { data: classData } = await supabase
+      .from('classes')
+      .select('teacher_id')
+      .eq('id', classId)
+      .single();
+    
+    if (!classData?.teacher_id) return null;
+    
+    const { data: teacherData } = await supabase
+      .from('users')
+      .select('gemini_api_key')
+      .eq('id', classData.teacher_id)
+      .single();
+    
+    return teacherData?.gemini_api_key || null;
+  }
+  
+  // 교사인 경우: 자신의 API 키 사용
+  const { data } = await supabase
+    .from('users')
+    .select('gemini_api_key')
+    .eq('id', currentUser.id)
+    .single();
+  
+  return data?.gemini_api_key || null;
+};
 
 export const aiService = {
-  getEncouragingFeedback: async (reflection: Reflection): Promise<{ feedback: string, sentiment: string }> => {
-    const apiKey = localStorage.getItem('GEMINI_API_KEY');
+  getEncouragingFeedback: async (reflection: Reflection, classId?: string): Promise<{ feedback: string, sentiment: string }> => {
+    const apiKey = await getTeacherApiKey(classId);
     if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
       return { feedback: "", sentiment: "neutral" };
     }
@@ -30,8 +64,8 @@ JSON 형식으로만 응답: {"feedback": "격려 메시지", "sentiment": "posi
     }
   },
 
-  analyzeClassroomIssues: async (reflections: (Reflection & { studentName: string })[]): Promise<any> => {
-    const apiKey = localStorage.getItem('GEMINI_API_KEY');
+  analyzeClassroomIssues: async (reflections: (Reflection & { studentName: string })[], classId?: string): Promise<any> => {
+    const apiKey = await getTeacherApiKey(classId);
     if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
       return { 
         summary: "API 키가 설정되지 않았습니다.", 

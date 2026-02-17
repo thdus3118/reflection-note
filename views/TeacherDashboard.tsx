@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User, Reflection, UserRole, ClassInfo } from '../types';
 import { DB } from '../store';
 import { aiService } from '../geminiService';
+import { ApiKeySettings } from '../components/ApiKeySettings';
+import { supabase } from '../supabaseClient';
 
 interface TeacherDashboardProps {
   user: User;
@@ -50,18 +52,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
   useEffect(() => { refreshData(); checkApiKey(); }, []);
 
   const checkApiKey = async () => {
-    const apiKey = localStorage.getItem('GEMINI_API_KEY');
-    setHasApiKey(!!apiKey && apiKey !== 'PLACEHOLDER_API_KEY');
+    const { data } = await supabase
+      .from('users')
+      .select('gemini_api_key')
+      .eq('id', user.id)
+      .single();
+    
+    setHasApiKey(!!data?.gemini_api_key && data.gemini_api_key !== 'PLACEHOLDER_API_KEY');
   };
 
-  const handleConnectApiKey = async () => {
-    const apiKey = prompt('개인 Gemini API 키를 입력하세요:');
-    if (apiKey && apiKey.trim()) {
-      localStorage.setItem('GEMINI_API_KEY', apiKey.trim());
-      setHasApiKey(true);
-      setSuccessMessage("API 키가 성공적으로 연결되었습니다.");
-    }
-  };
+
 
   useEffect(() => {
     if (activeTab === 'analysis' && selectedClassId !== 'all') {
@@ -275,7 +275,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
       .map(r => ({ ...r, studentName: students.find(s => s.id === r.studentId)?.name || '알 수 없음' }));
     if (targetReflections.length === 0) { alert(`${targetDate} 데이터가 없습니다.`); setIsAnalyzing(false); return; }
     try {
-      const result = await aiService.analyzeClassroomIssues(targetReflections);
+      const result = await aiService.analyzeClassroomIssues(targetReflections, selectedClassId);
       const cacheKey = `${selectedClassId}_${targetDate}`;
       await DB.setAnalysis(cacheKey, result);
       setAnalysis(result);
@@ -544,11 +544,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
             </form>
           </div>
           <div className="bg-white p-12 rounded-[3rem] border border-slate-200 shadow-sm space-y-10">
-            <div><h3 className="text-2xl font-black text-slate-800">Gemini AI 서비스 연결</h3><p className="text-sm text-slate-400 font-bold mt-2 leading-relaxed">자신의 API 키를 연결하여 학급 분석 기능을 활성화하세요.</p></div>
-            <div className={`p-8 rounded-[2rem] border-2 flex items-center justify-between gap-6 ${hasApiKey ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
-              <div className="flex items-center gap-4"><div className={`w-4 h-4 rounded-full ${hasApiKey ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div><div className="font-black text-slate-700">AI 분석 엔진: {hasApiKey ? '활성화됨' : '비활성'}</div></div>
-              <button onClick={handleConnectApiKey} className="bg-indigo-600 text-white px-8 py-4 rounded-xl font-black text-sm">{hasApiKey ? '키 다시 연결' : 'Gemini 연결하기'}</button>
-            </div>
+            <ApiKeySettings userId={user.id} />
           </div>
         </div>
       )}

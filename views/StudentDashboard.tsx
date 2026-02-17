@@ -74,7 +74,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser 
     }
 
     try {
-      const aiRes = await aiService.getEncouragingFeedback(updatedReflection);
+      const aiRes = await aiService.getEncouragingFeedback(updatedReflection, user.classId);
       if (aiRes.feedback && !aiRes.feedback.includes('API 사용량')) {
         updatedReflection.aiFeedback = aiRes.feedback;
         updatedReflection.sentiment = aiRes.sentiment as any;
