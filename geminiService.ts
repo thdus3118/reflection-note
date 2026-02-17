@@ -66,6 +66,8 @@ JSON 형식으로만 응답: {"feedback": "격려 메시지", "sentiment": "posi
 
   analyzeClassroomIssues: async (reflections: (Reflection & { studentName: string })[], classId?: string): Promise<any> => {
     const apiKey = await getTeacherApiKey(classId);
+    console.log('🔑 API Key check:', { hasKey: !!apiKey, keyLength: apiKey?.length, classId });
+    
     if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
       return { 
         summary: "API 키가 설정되지 않았습니다.", 
