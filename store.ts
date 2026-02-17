@@ -241,13 +241,12 @@ export const DB = {
   },
 
   deleteClass: async (classId: string) => {
-    // 학급에 학생이 있는지 확인
+    // 학급에 학생이 있는지 확인 (비활성화 포함)
     const { data: students } = await supabase
       .from('users')
       .select('id')
       .eq('class_id', classId)
-      .eq('role', UserRole.STUDENT)
-      .eq('is_active', true);
+      .eq('role', UserRole.STUDENT);
     
     if (students && students.length > 0) {
       throw new Error('학급에 등록된 학생이 있습니다.');
