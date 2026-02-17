@@ -241,11 +241,20 @@ export const DB = {
   },
 
   deleteClass: async (classId: string) => {
+    // 학급에 학생이 있는지 확인
+    const { data: students } = await supabase
+      .from('users')
+      .select('id')
+      .eq('class_id', classId)
+      .eq('role', UserRole.STUDENT)
+      .eq('is_active', true);
+    
+    if (students && students.length > 0) {
+      throw new Error('학급에 등록된 학생이 있습니다.');
+    }
+    
     const { error: classError } = await supabase.from('classes').delete().eq('id', classId);
     if (classError) throw classError;
-    
-    const { error: userError } = await supabase.from('users').update({ class_id: null }).eq('class_id', classId);
-    if (userError) throw userError;
   },
 
   init: async () => {
