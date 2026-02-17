@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/genai";
 import { Reflection } from "./types";
 import { supabase } from "./supabaseClient";
 
