@@ -73,17 +73,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser 
       updatedReflection = { id: crypto.randomUUID(), studentId: user.id, date: today, ...data, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     }
 
-    try {
-      const aiRes = await aiService.getEncouragingFeedback(updatedReflection, user.classId);
-      if (aiRes.feedback && !aiRes.feedback.includes('API 사용량')) {
-        updatedReflection.aiFeedback = aiRes.feedback;
-        updatedReflection.sentiment = aiRes.sentiment as any;
-      }
-    } catch (e) { 
-      console.error(e);
-      // AI 피드백 실패해도 저장은 계속
-    }
-
+    // 즉시 저장 (AI 피드백 없이)
     let nextAllReflections;
     if (existingIdx > -1) {
       nextAllReflections = allReflections.map((r, idx) => idx === existingIdx ? updatedReflection : r);
@@ -91,11 +81,30 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser 
       nextAllReflections = [updatedReflection, ...allReflections];
     }
 
-    DB.setReflections(nextAllReflections);
+    await DB.setReflections(nextAllReflections);
     await refreshData();
     setIsSubmitting(false);
     setIsEditing(false);
     setSuccessMessage("성찰 노트가 성공적으로 제출되었습니다!");
+
+    // AI 피드백은 백그라운드에서 비동기 처리 (속도 개선)
+    (async () => {
+      try {
+        const aiRes = await aiService.getEncouragingFeedback(updatedReflection, user.classId);
+        if (aiRes.feedback && !aiRes.feedback.includes('API 사용량')) {
+          const latestReflections = await DB.getReflections();
+          const targetIdx = latestReflections.findIndex(r => r.id === updatedReflection.id);
+          if (targetIdx > -1) {
+            latestReflections[targetIdx].aiFeedback = aiRes.feedback;
+            latestReflections[targetIdx].sentiment = aiRes.sentiment as any;
+            await DB.setReflections(latestReflections);
+            await refreshData();
+          }
+        }
+      } catch (e) { 
+        console.error('AI 피드백 생성 실패:', e);
+      }
+    })();
   };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
