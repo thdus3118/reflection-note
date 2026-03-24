@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { User, Reflection, ClassInfo, UserRole } from './types';
+import { User, Reflection, ClassInfo, UserRole, WeeklyFeedback } from './types';
 
 // 세션 관리는 localStorage 유지 (클라이언트 측)
 const SESSION_KEY = 'reflection_note_session_v2';
@@ -117,6 +117,35 @@ export const DB = {
       result: { ...result, timestamp: new Date().toISOString() },
       timestamp: new Date().toISOString()
     });
+    if (error) throw error;
+  },
+
+  getWeeklyFeedbacks: async (studentId: string): Promise<WeeklyFeedback[]> => {
+    const { data, error } = await supabase
+      .from('weekly_ai_feedbacks')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('week_start', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(w => ({
+      id: w.id,
+      studentId: w.student_id,
+      classId: w.class_id,
+      weekStart: w.week_start,
+      weekEnd: w.week_end,
+      feedback: w.feedback,
+      createdAt: w.created_at
+    }));
+  },
+
+  saveWeeklyFeedback: async (fb: Omit<WeeklyFeedback, 'id' | 'createdAt'>) => {
+    const { error } = await supabase.from('weekly_ai_feedbacks').upsert({
+      student_id: fb.studentId,
+      class_id: fb.classId,
+      week_start: fb.weekStart,
+      week_end: fb.weekEnd,
+      feedback: fb.feedback
+    }, { onConflict: 'student_id,week_start' });
     if (error) throw error;
   },
 

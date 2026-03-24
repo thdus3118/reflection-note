@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Reflection, ClassInfo } from '../types';
+import { User, Reflection, ClassInfo, WeeklyFeedback } from '../types';
 import { DB } from '../store';
 import ReflectionForm from '../components/ReflectionForm';
 import { aiService } from '../geminiService';
@@ -13,9 +13,11 @@ interface StudentDashboardProps {
 const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser }) => {
   const [reflections, setReflections] = useState<Reflection[]>([]);
   const [classInfo, setClassInfo] = useState<ClassInfo | null>(null);
+  const [weeklyFeedbacks, setWeeklyFeedbacks] = useState<WeeklyFeedback[]>([]);
+  const [latestFeedback, setLatestFeedback] = useState<WeeklyFeedback | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [view, setView] = useState<'form' | 'history' | 'calendar' | 'settings'>(user.isFirstLogin ? 'settings' : 'form');
+  const [view, setView] = useState<'form' | 'history' | 'calendar' | 'feedback' | 'settings'>(user.isFirstLogin ? 'settings' : 'form');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,6 +50,18 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser 
     setReflections(myRef);
     const myClass = (await DB.getClasses()).find(c => c.id === user.classId);
     setClassInfo(myClass || null);
+    if (user.classId) {
+      const feedbacks = await DB.getWeeklyFeedbacks(user.id);
+      setWeeklyFeedbacks(feedbacks);
+      const now = new Date();
+      const day = now.getDay();
+      const diffToMonday = day === 0 ? -6 : 1 - day;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() + diffToMonday);
+      const weekStartStr = monday.toISOString().split('T')[0];
+      const thisWeek = feedbacks.find(f => f.weekStart === weekStartStr);
+      setLatestFeedback(thisWeek || feedbacks[0] || null);
+    }
   };
 
   const todaysReflection = reflections.find(r => r.date === today);
@@ -283,6 +297,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser 
           { id: 'form', label: '오늘 성찰', icon: '📝' },
           { id: 'history', label: '누적 기록', icon: '📖' },
           { id: 'calendar', label: '현황 달력', icon: '📅' },
+          { id: 'feedback', label: 'AI 피드백', icon: '🤖' },
           { id: 'settings', label: '개인 설정', icon: '⚙️' }
         ].map(tab => (
           <button key={tab.id} onClick={() => { setView(tab.id as any); setIsEditing(false); }} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-sm font-black transition-all whitespace-nowrap ${view === tab.id ? 'bg-slate-800 text-white shadow-xl' : 'bg-white text-slate-500 border border-slate-200'}`}>
@@ -293,6 +308,19 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser 
 
       {view === 'form' && (
         <div className="max-w-2xl mx-auto space-y-6">
+          {latestFeedback && (
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-8 rounded-[2rem] shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-8 translate-x-8"></div>
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs font-black bg-white/20 px-3 py-1 rounded-full">🤖 AI 주간 피드백</span>
+                  <span className="text-xs text-white/60 font-bold">{latestFeedback.weekStart} ~ {latestFeedback.weekEnd}</span>
+                </div>
+                <p className="text-sm font-bold leading-relaxed text-white/90">{latestFeedback.feedback}</p>
+                <button onClick={() => setView('feedback')} className="mt-4 text-xs font-black text-white/70 hover:text-white underline">이전 피드백 모두 보기 →</button>
+              </div>
+            </div>
+          )}
           {alreadySubmitted && !isEditing ? (
             <div className="bg-white border p-12 rounded-[3rem] text-center space-y-8 shadow-sm">
               <div className="bg-emerald-100 text-emerald-600 w-24 h-24 rounded-[2.5rem] flex items-center justify-center mx-auto text-5xl">✓</div>
@@ -336,6 +364,24 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser 
             </div>
           ))}
           {reflections.length === 0 && <div className="py-24 text-center font-black text-slate-200 text-2xl border-4 border-dashed rounded-[3rem]">아직 기록이 없습니다.</div>}
+        </div>
+      )}
+
+      {view === 'feedback' && (
+        <div className="space-y-6 animate-in slide-in-from-bottom-8">
+          <h3 className="text-xl font-black text-slate-800 px-2">🤖 AI 주간 피드백 누적 기록</h3>
+          {weeklyFeedbacks.length === 0 ? (
+            <div className="py-24 text-center font-black text-slate-200 text-2xl border-4 border-dashed rounded-[3rem]">아직 피드백이 없습니다.</div>
+          ) : (
+            weeklyFeedbacks.map(fb => (
+              <div key={fb.id} className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-black bg-indigo-100 text-indigo-600 px-4 py-1.5 rounded-full">{fb.weekStart} ~ {fb.weekEnd}</span>
+                </div>
+                <p className="text-slate-700 font-bold leading-relaxed text-sm">{fb.feedback}</p>
+              </div>
+            ))
+          )}
         </div>
       )}
 

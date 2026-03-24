@@ -25,6 +25,16 @@ export interface ClassInfo {
   targetDays: number; // 수업일 설정 (작성률 계산용)
 }
 
+export interface WeeklyFeedback {
+  id: string;
+  studentId: string;
+  classId: string;
+  weekStart: string; // YYYY-MM-DD (월요일)
+  weekEnd: string;   // YYYY-MM-DD (일요일)
+  feedback: string;
+  createdAt: string;
+}
+
 export interface Reflection {
   id: string;
   studentId: string;

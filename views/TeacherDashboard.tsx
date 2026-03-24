@@ -27,6 +27,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
   
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGeneratingWeekly, setIsGeneratingWeekly] = useState(false);
   const [analysis, setAnalysis] = useState<any>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(today);
@@ -267,6 +268,54 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
     }
   };
 
+  const getWeekRange = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    return {
+      weekStart: monday.toISOString().split('T')[0],
+      weekEnd: sunday.toISOString().split('T')[0]
+    };
+  };
+
+  const handleGenerateWeeklyFeedback = async (classId: string) => {
+    if (!hasApiKey || classId === 'all') return;
+    setIsGeneratingWeekly(true);
+    try {
+      const { weekStart, weekEnd } = getWeekRange();
+      const classStudents = students.filter(s => s.classId === classId);
+
+      if (classStudents.length === 0) { alert('학생이 없습니다.'); return; }
+
+      let successCount = 0;
+      for (const student of classStudents) {
+        const studentReflections = reflections.filter(
+          r => r.studentId === student.id && r.date >= weekStart && r.date <= weekEnd
+        );
+        const feedback = await aiService.generateWeeklyFeedback(
+          studentReflections.map(r => ({ ...r, studentName: student.name })),
+          student,
+          weekStart,
+          weekEnd,
+          classId
+        );
+        if (feedback) {
+          await DB.saveWeeklyFeedback({ studentId: student.id, classId, weekStart, weekEnd, feedback });
+          successCount++;
+        }
+      }
+      setSuccessMessage(`${successCount}명의 주간 AI 피드백이 생성되었습니다.`);
+    } catch (e) {
+      alert('피드백 생성 중 오류가 발생했습니다.');
+    } finally {
+      setIsGeneratingWeekly(false);
+    }
+  };
+
   const runAnalysis = async (targetDate: string = today) => {
     if (!hasApiKey || selectedClassId === 'all') return;
     setIsAnalyzing(true);
@@ -377,6 +426,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
                 </div>
                 <button onClick={() => runAnalysis(today)} disabled={isAnalyzing || selectedClassId === 'all' || !hasApiKey} className="bg-indigo-600 text-white px-12 py-5 rounded-2xl font-black hover:bg-indigo-700 disabled:bg-slate-200 transition-all shadow-xl shadow-indigo-100 whitespace-nowrap">
                   {isAnalyzing ? "Gemini가 분석 중..." : "오늘의 학급 분석 시작"}
+                </button>
+                <button onClick={() => handleGenerateWeeklyFeedback(selectedClassId)} disabled={isGeneratingWeekly || selectedClassId === 'all' || !hasApiKey} className="bg-purple-600 text-white px-8 py-5 rounded-2xl font-black hover:bg-purple-700 disabled:bg-slate-200 transition-all shadow-xl shadow-purple-100 whitespace-nowrap">
+                  {isGeneratingWeekly ? '생성 중...' : '한 주 요약 피드백 생성'}
                 </button>
               </div>
               {analysisHistory.length > 0 && (

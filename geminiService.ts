@@ -51,7 +51,7 @@ JSON으로만 응답: {"feedback": "20자 이내 격려", "sentiment": "positive
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash-preview-05-20",
         contents: prompt,
         generationConfig: { maxOutputTokens: 50 }
       });
@@ -59,6 +59,58 @@ JSON으로만 응답: {"feedback": "20자 이내 격려", "sentiment": "positive
     } catch (error: any) {
       console.error("AI Feedback Error:", error);
       return { feedback: "", sentiment: "neutral" };
+    }
+  },
+
+  generateWeeklyFeedback: async (
+    reflections: (Reflection & { studentName: string })[],
+    student: { id: string; name: string },
+    weekStart: string,
+    weekEnd: string,
+    classId: string
+  ): Promise<string> => {
+    const apiKey = await getTeacherApiKey(classId);
+    if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') return '';
+
+    const ai = new GoogleGenAI({ apiKey });
+    const TARGET_COUNT = 3;
+    const writeCount = reflections.length;
+
+    const reflectionText = writeCount > 0
+      ? reflections.map((r, i) =>
+          `[${i + 1}일차] 별점:${r.attitudeRating} | 학습:${r.learnedContent} | 활동:${r.activities} | 협동:${r.collaboration}`
+        ).join('\n')
+      : '이번 주 작성한 성찰이 없습니다.';
+
+    const prompt = `당신은 영어 회화 수업을 담당하는 따뜻한 선생님입니다.
+${student.name} 학생의 이번 주(${weekStart} ~ ${weekEnd}) 성찰 노트를 바탕으로 개별 피드백을 작성해주세요.
+
+[성찰 데이터]
+${reflectionText}
+
+[피드백 작성 기준]
+1. 작성 횟수: 이번 주 ${writeCount}/${TARGET_COUNT}회 작성${writeCount < TARGET_COUNT ? ` (${TARGET_COUNT - writeCount}회 부족 - 꾸준한 작성 독려)` : ' (목표 달성 - 칭찬)'}
+2. 영어 회화 수업 참여도 및 학습 성찰의 질 평가 (구체적인지, 영어 회화와 직접 연관되는지)
+3. 모둠 활동 참여 및 협동 성찰의 질 평가
+4. 다음 주 구체적 개선 조언
+
+조건:
+- 3~5문장, 진심어린 한국어
+- ${student.name} 학생에게 직접 말하는 투로
+- 성찰이 없으면 작성 독려 위주로
+
+피드백 텍스트만 바로 출력:`;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-preview-05-20',
+        contents: prompt,
+        generationConfig: { maxOutputTokens: 400 }
+      });
+      return response.text.trim();
+    } catch (e) {
+      console.error('Weekly feedback error:', e);
+      return '';
     }
   },
 
@@ -109,7 +161,7 @@ JSON 형식으로만 응답:
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash-preview-05-20",
         contents: prompt
       });
       return JSON.parse(response.text.replace(/```json\n?|\n?```/g, ''));
