@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Reflection, UserRole, ClassInfo } from '../types';
+import { User, Reflection, UserRole, ClassInfo, WeeklyFeedback } from '../types';
 import { DB } from '../store';
 import { aiService } from '../geminiService';
 import { ApiKeySettings } from '../components/ApiKeySettings';
@@ -34,6 +34,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
   const [analysisDateInput, setAnalysisDateInput] = useState<string>(today);
   const [analysisHistory, setAnalysisHistory] = useState<Array<{date: string, data: any}>>([]);
   const [historySelectedItem, setHistorySelectedItem] = useState<{date: string, data: any} | null>(null);
+  const [historyViewMode, setHistoryViewMode] = useState<'daily' | 'weekly'>('daily');
+  const [classWeeklyFeedbacks, setClassWeeklyFeedbacks] = useState<WeeklyFeedback[]>([]);
+  const [selectedWeek, setSelectedWeek] = useState<string>('');
   
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
   const [selectedStudent, setSelectedStudent] = useState<User | null>(null);
@@ -79,9 +82,20 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
         
         const cacheKey = `${selectedClassId}_${selectedDate}`;
         setAnalysis(allAnalyses[cacheKey] || null);
+
+        const weeklies = await DB.getWeeklyFeedbacksByClass(selectedClassId);
+        setClassWeeklyFeedbacks(weeklies);
+        if (weeklies.length > 0) {
+          const weeks = Array.from(new Set(weeklies.map(w => w.weekStart)));
+          if (!weeks.includes(selectedWeek)) {
+            setSelectedWeek(weeks[0]);
+          }
+        } else {
+          setSelectedWeek('');
+        }
       })();
     }
-  }, [selectedClassId, activeTab, selectedDate]);
+  }, [selectedClassId, activeTab, selectedDate, selectedWeek]);
 
   useEffect(() => {
     if (successMessage) {
@@ -236,6 +250,32 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `성찰기록_${className}_${today}.csv`;
+    link.click();
+  };
+
+  const handleExportWeeklyCSV = () => {
+    if (!selectedWeek || classWeeklyFeedbacks.length === 0) return;
+    const targetClass = classes.find(c => c.id === selectedClassId);
+    const className = targetClass ? targetClass.name : '학급';
+    let csvContent = "\uFEFF학번,이름,시작일,종료일,AI주간피드백\n";
+    
+    const weekData = classWeeklyFeedbacks.filter(f => f.weekStart === selectedWeek);
+    weekData.forEach(f => {
+      const studentInfo = students.find(s => s.id === f.studentId);
+      const row = [
+        studentInfo?.studentId || 'N/A',
+        studentInfo?.name || '알 수 없음',
+        f.weekStart,
+        f.weekEnd,
+        `"${f.feedback.replace(/"/g, '""')}"`
+      ];
+      csvContent += row.join(",") + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `주간피드백_${className}_${selectedWeek}.csv`;
     link.click();
   };
 
@@ -548,52 +588,98 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
         <div className="space-y-6 animate-in slide-in-from-bottom-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="space-y-1">
-              <h3 className="font-black text-slate-800 text-2xl">📋 학급 분석 기록</h3>
-              <p className="text-sm text-slate-400 font-bold">{selectedClassId === 'all' ? '학급을 먼저 선택해주세요.' : `${classes.find(c => c.id === selectedClassId)?.name}의 누적 분석 기록입니다.`}</p>
+              <h3 className="font-black text-slate-800 text-2xl">📋 기록 조회</h3>
+              <p className="text-sm text-slate-400 font-bold">{selectedClassId === 'all' ? '학급을 먼저 선택해주세요.' : `${classes.find(c => c.id === selectedClassId)?.name}의 누적 분석 및 피드백 기록입니다.`}</p>
             </div>
+            {selectedClassId !== 'all' && (
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+                <button onClick={() => setHistoryViewMode('daily')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${historyViewMode === 'daily' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>일일 학급 분석</button>
+                <button onClick={() => setHistoryViewMode('weekly')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${historyViewMode === 'weekly' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>주간 학생 피드백</button>
+              </div>
+            )}
           </div>
+          
           {selectedClassId === 'all' ? (
             <div className="py-24 text-center font-black text-slate-200 text-2xl border-4 border-dashed rounded-[3rem]">학급을 선택해주세요</div>
-          ) : analysisHistory.length === 0 ? (
-            <div className="py-24 text-center font-black text-slate-200 text-2xl border-4 border-dashed rounded-[3rem]">분석 기록이 없습니다</div>
-          ) : (
-            <div className="grid gap-4">
-              {analysisHistory.map(h => (
-                <div key={h.date} className={`bg-white p-8 rounded-[2rem] border-2 shadow-sm space-y-4 cursor-pointer transition-all hover:scale-[1.005] ${historySelectedItem?.date === h.date ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-200'}`} onClick={() => setHistorySelectedItem(historySelectedItem?.date === h.date ? null : h)}>
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="flex items-center gap-4">
-                      <span className={`px-4 py-2 rounded-xl text-xs font-black ${h.date === today ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{h.date} {h.date === today ? '(오늘)' : ''}</span>
-                      <span className="text-sm font-bold text-slate-500">평균 만족도 <span className="text-amber-500 font-black">{h.data.statistics?.averageRating?.toFixed(1) || '-'}</span></span>
-                      <span className="text-sm font-bold text-slate-500">경고 <span className="text-rose-500 font-black">{h.data.statistics?.alertCount || 0}건</span></span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={(e) => { e.stopPropagation(); handleDeleteAnalysis(h.date); }} className="text-[10px] font-black text-rose-500 bg-rose-50 px-4 py-2 rounded-xl hover:bg-rose-100 transition-colors">삭제</button>
-                    </div>
-                  </div>
-                  <p className="text-sm font-bold text-slate-600 leading-relaxed line-clamp-2">{h.data.summary}</p>
-                  {historySelectedItem?.date === h.date && (
-                    <div className="space-y-6 pt-4 border-t border-slate-100 animate-in slide-in-from-top-2">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-slate-50 p-4 rounded-2xl"><div className="text-[10px] font-black text-slate-400 uppercase">평균 만족도</div><div className="text-2xl font-black text-amber-500 mt-1">{h.data.statistics?.averageRating?.toFixed(1) || '-'} <span className="text-sm text-slate-300">/ 5.0</span></div></div>
-                        <div className="bg-slate-50 p-4 rounded-2xl"><div className="text-[10px] font-black text-slate-400 uppercase">긍정 성찰</div><div className="text-2xl font-black text-emerald-500 mt-1">{h.data.statistics?.positiveCount || 0}명</div></div>
-                        <div className="bg-rose-50 p-4 rounded-2xl"><div className="text-[10px] font-black text-rose-400 uppercase">집중 지도 권고</div><div className="text-2xl font-black text-rose-600 mt-1">{h.data.statistics?.alertCount || 0}건</div></div>
+          ) : historyViewMode === 'daily' ? (
+            analysisHistory.length === 0 ? (
+              <div className="py-24 text-center font-black text-slate-200 text-2xl border-4 border-dashed rounded-[3rem]">분석 기록이 없습니다</div>
+            ) : (
+              <div className="grid gap-4">
+                {analysisHistory.map(h => (
+                  <div key={h.date} className={`bg-white p-8 rounded-[2rem] border-2 shadow-sm space-y-4 cursor-pointer transition-all hover:scale-[1.005] ${historySelectedItem?.date === h.date ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-200'}`} onClick={() => setHistorySelectedItem(historySelectedItem?.date === h.date ? null : h)}>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div className="flex items-center gap-4">
+                        <span className={`px-4 py-2 rounded-xl text-xs font-black ${h.date === today ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{h.date} {h.date === today ? '(오늘)' : ''}</span>
+                        <span className="text-sm font-bold text-slate-500">평균 만족도 <span className="text-amber-500 font-black">{h.data.statistics?.averageRating?.toFixed(1) || '-'}</span></span>
+                        <span className="text-sm font-bold text-slate-500">경고 <span className="text-rose-500 font-black">{h.data.statistics?.alertCount || 0}건</span></span>
                       </div>
-                      <div className="bg-slate-50 p-6 rounded-2xl"><label className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mb-2 block">학급 브리핑</label><p className="text-slate-700 leading-relaxed font-bold">{h.data.summary}</p></div>
-                      {h.data.detectedIssues?.length > 0 && (
-                        <div className="space-y-3">
-                          <label className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] block">지도 필요 학생</label>
-                          {h.data.detectedIssues.map((issue: any, i: number) => (
-                            <div key={i} className="bg-slate-50 p-4 rounded-xl flex flex-col md:flex-row gap-4">
-                              <div className="flex items-center gap-2"><span className={`px-2 py-1 rounded-full text-[10px] font-black ${issue.severity === 'high' ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-600'}`}>{issue.issueType}</span><span className="font-black text-slate-700">{issue.studentName}</span></div>
-                              <p className="text-xs font-bold text-slate-500 flex-1">{issue.description}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <div className="flex gap-2">
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteAnalysis(h.date); }} className="text-[10px] font-black text-rose-500 bg-rose-50 px-4 py-2 rounded-xl hover:bg-rose-100 transition-colors">삭제</button>
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                    <p className="text-sm font-bold text-slate-600 leading-relaxed line-clamp-2">{h.data.summary}</p>
+                    {historySelectedItem?.date === h.date && (
+                      <div className="space-y-6 pt-4 border-t border-slate-100 animate-in slide-in-from-top-2">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-slate-50 p-4 rounded-2xl"><div className="text-[10px] font-black text-slate-400 uppercase">평균 만족도</div><div className="text-2xl font-black text-amber-500 mt-1">{h.data.statistics?.averageRating?.toFixed(1) || '-'} <span className="text-sm text-slate-300">/ 5.0</span></div></div>
+                          <div className="bg-slate-50 p-4 rounded-2xl"><div className="text-[10px] font-black text-slate-400 uppercase">긍정 성찰</div><div className="text-2xl font-black text-emerald-500 mt-1">{h.data.statistics?.positiveCount || 0}명</div></div>
+                          <div className="bg-rose-50 p-4 rounded-2xl"><div className="text-[10px] font-black text-rose-400 uppercase">집중 지도 권고</div><div className="text-2xl font-black text-rose-600 mt-1">{h.data.statistics?.alertCount || 0}건</div></div>
+                        </div>
+                        <div className="bg-slate-50 p-6 rounded-2xl"><label className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mb-2 block">학급 브리핑</label><p className="text-slate-700 leading-relaxed font-bold">{h.data.summary}</p></div>
+                        {h.data.detectedIssues?.length > 0 && (
+                          <div className="space-y-3">
+                            <label className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] block">지도 필요 학생</label>
+                            {h.data.detectedIssues.map((issue: any, i: number) => (
+                              <div key={i} className="bg-slate-50 p-4 rounded-xl flex flex-col md:flex-row gap-4">
+                                <div className="flex items-center gap-2"><span className={`px-2 py-1 rounded-full text-[10px] font-black ${issue.severity === 'high' ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-600'}`}>{issue.issueType}</span><span className="font-black text-slate-700">{issue.studentName}</span></div>
+                                <p className="text-xs font-bold text-slate-500 flex-1">{issue.description}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          ) : (
+            <div className="space-y-4">
+              {classWeeklyFeedbacks.length === 0 ? (
+                <div className="py-24 text-center font-black text-slate-200 text-2xl border-4 border-dashed rounded-[3rem]">주간 피드백 기록이 없습니다</div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                    <label className="text-xs font-black text-slate-400">📅 주차 선택:</label>
+                    <select value={selectedWeek} onChange={e => setSelectedWeek(e.target.value)} className="text-sm font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl border-none outline-none cursor-pointer">
+                      {Array.from(new Set(classWeeklyFeedbacks.map(f => f.weekStart))).map(w => (
+                        <option key={w} value={w}>{w} ~ {classWeeklyFeedbacks.find(fw => fw.weekStart === w)?.weekEnd}</option>
+                      ))}
+                    </select>
+                    <button onClick={handleExportWeeklyCSV} className="ml-auto text-xs font-black text-emerald-600 bg-emerald-50 px-6 py-2 rounded-xl hover:bg-emerald-100 transition-colors">엑셀(CSV) 다운로드</button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {classWeeklyFeedbacks.filter(f => f.weekStart === selectedWeek).map(f => {
+                      const st = students.find(s => s.id === f.studentId);
+                      return (
+                        <div key={f.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center font-black text-lg">{st?.name[0] || '?'}</div>
+                            <div>
+                              <div className="font-black text-slate-800">{st?.name || '알 수 없음'}</div>
+                              <div className="text-[10px] font-bold text-slate-400">{st?.studentId || '-'}</div>
+                            </div>
+                          </div>
+                          <div className="bg-slate-50 p-4 rounded-2xl">
+                            <p className="text-sm font-bold text-slate-600 leading-relaxed">{f.feedback}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

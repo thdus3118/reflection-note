@@ -36,7 +36,7 @@ const getTeacherApiKey = async (classId?: string): Promise<string | null> => {
 };
 
 export const aiService = {
-  getEncouragingFeedback: async (reflection: Reflection, classId?: string): Promise<{ feedback: string, sentiment: string }> => {
+  getEncouragingFeedback: async (reflection: Reflection, classId?: string, weeklyContext?: string): Promise<{ feedback: string, sentiment: string }> => {
     const apiKey = await getTeacherApiKey(classId);
     if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
       return { feedback: "", sentiment: "neutral" };
@@ -44,8 +44,13 @@ export const aiService = {
 
     const ai = new GoogleGenAI({ apiKey });
 
+    let contextString = "";
+    if (weeklyContext) {
+      contextString = `\n[학생의 최근 주간 피드백 참고자료]\n${weeklyContext}\n\n위 참고자료의 맥락을 이어서 위 성찰에 대한 한 줄 칭찬/격려를 해주세요. 예: "지난주엔 ~~해서 아쉬웠는데 이번엔 ~~하려 노력했네! 멋지다!"`;
+    }
+
     const prompt = `학생의 성찰에 대해 한 문장으로 짧고 따뜻한 격려를 해주세요.
-성찰: 학습=${reflection.learnedContent}, 활동=${reflection.activities}, 협동=${reflection.collaboration}, 태도=${reflection.attitudeRating}점
+성찰: 학습=${reflection.learnedContent}, 활동=${reflection.activities}, 협동=${reflection.collaboration}, 태도=${reflection.attitudeRating}점${contextString}
 
 JSON으로만 응답: {"feedback": "20자 이내 격려", "sentiment": "positive|neutral|negative"}`;
 
@@ -53,7 +58,7 @@ JSON으로만 응답: {"feedback": "20자 이내 격려", "sentiment": "positive
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-05-20",
         contents: prompt,
-        generationConfig: { maxOutputTokens: 50 }
+        config: { maxOutputTokens: 50 }
       });
       return JSON.parse(response.text.replace(/```json\n?|\n?```/g, ''));
     } catch (error: any) {
@@ -105,7 +110,7 @@ ${reflectionText}
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-preview-05-20',
         contents: prompt,
-        generationConfig: { maxOutputTokens: 400 }
+        config: { maxOutputTokens: 400 }
       });
       return response.text.trim();
     } catch (e) {

@@ -104,7 +104,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser 
     // AI 피드백은 백그라운드에서 비동기 처리 (속도 개선)
     (async () => {
       try {
-        const aiRes = await aiService.getEncouragingFeedback(updatedReflection, user.classId);
+        const aiRes = await aiService.getEncouragingFeedback(updatedReflection, user.classId, latestFeedback?.feedback);
         if (aiRes.feedback && !aiRes.feedback.includes('API 사용량')) {
           const latestReflections = await DB.getReflections();
           const targetIdx = latestReflections.findIndex(r => r.id === updatedReflection.id);

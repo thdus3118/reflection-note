@@ -138,6 +138,24 @@ export const DB = {
     }));
   },
 
+  getWeeklyFeedbacksByClass: async (classId: string): Promise<WeeklyFeedback[]> => {
+    const { data, error } = await supabase
+      .from('weekly_ai_feedbacks')
+      .select('*')
+      .eq('class_id', classId)
+      .order('week_start', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(w => ({
+      id: w.id,
+      studentId: w.student_id,
+      classId: w.class_id,
+      weekStart: w.week_start,
+      weekEnd: w.week_end,
+      feedback: w.feedback,
+      createdAt: w.created_at
+    }));
+  },
+
   saveWeeklyFeedback: async (fb: Omit<WeeklyFeedback, 'id' | 'createdAt'>) => {
     const { error } = await supabase.from('weekly_ai_feedbacks').upsert({
       student_id: fb.studentId,
