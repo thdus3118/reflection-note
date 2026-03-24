@@ -313,7 +313,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onUpdateUser 
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-8 translate-x-8"></div>
               <div className="relative">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs font-black bg-white/20 px-3 py-1 rounded-full">🤖 AI 주간 피드백</span>
+                  <span className="text-xs font-black bg-white/20 px-3 py-1 rounded-full">💡 이번 주 성찰 가이드</span>
                   <span className="text-xs text-white/60 font-bold">{latestFeedback.weekStart} ~ {latestFeedback.weekEnd}</span>
                 </div>
                 <p className="text-sm font-bold leading-relaxed text-white/90">{latestFeedback.feedback}</p>
