@@ -58,7 +58,7 @@ JSON으로만 응답: {"feedback": "20자 이내 격려", "sentiment": "positive
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-05-20",
         contents: prompt,
-        config: { maxOutputTokens: 50 }
+        config: { maxOutputTokens: 50, responseMimeType: "application/json" }
       });
       return JSON.parse(response.text.replace(/```json\n?|\n?```/g, ''));
     } catch (error: any) {
@@ -167,7 +167,8 @@ JSON 형식으로만 응답:
     try {
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-05-20",
-        contents: prompt
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
       });
       return JSON.parse(response.text.replace(/```json\n?|\n?```/g, ''));
     } catch (error: any) {
