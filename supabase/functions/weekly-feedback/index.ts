@@ -75,19 +75,8 @@ ${reflectionText}
   return json.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
-  const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
-  const classId: string | undefined = body.class_id;
-
-  if (!classId) {
-    return new Response(JSON.stringify({ error: 'class_id required' }), { status: 400 });
-  }
-
-  const { weekStart, weekEnd } = getWeekRange();
+async function processClass(classId: string, weekStart: string, weekEnd: string): Promise<string[]> {
+  const results: string[] = [];
 
   const { data: cls, error: classErr } = await supabase
     .from('classes')
@@ -96,7 +85,8 @@ Deno.serve(async (req) => {
     .single();
 
   if (classErr || !cls) {
-    return new Response(JSON.stringify({ error: classErr?.message ?? 'class not found' }), { status: 404 });
+    results.push(`class ${classId}: not found`);
+    return results;
   }
 
   const { data: teacher } = await supabase
@@ -107,7 +97,8 @@ Deno.serve(async (req) => {
 
   const apiKey = teacher?.gemini_api_key;
   if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
-    return new Response(JSON.stringify({ error: 'no api key' }), { status: 400 });
+    results.push(`class ${classId}: no api key`);
+    return results;
   }
 
   const { data: students } = await supabase
@@ -117,12 +108,9 @@ Deno.serve(async (req) => {
     .eq('is_active', true);
 
   if (!students?.length) {
-    return new Response(JSON.stringify({ weekStart, weekEnd, results: ['no students'] }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    results.push(`class ${classId}: no students`);
+    return results;
   }
-
-  const results: string[] = [];
 
   for (const student of students) {
     const { data: existing } = await supabase
@@ -162,7 +150,40 @@ Deno.serve(async (req) => {
     await new Promise(r => setTimeout(r, 1500));
   }
 
-  return new Response(JSON.stringify({ weekStart, weekEnd, results }), {
+  return results;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+  const classId: string | undefined = body.class_id;
+
+  const { weekStart, weekEnd } = getWeekRange();
+  let allResults: string[] = [];
+
+  if (classId) {
+    // 특정 학급만 처리 (수동 호출 시)
+    allResults = await processClass(classId, weekStart, weekEnd);
+  } else {
+    // 모든 학급 순회 (cron 자동 호출 시)
+    const { data: allClasses } = await supabase
+      .from('classes')
+      .select('id');
+
+    if (allClasses && allClasses.length > 0) {
+      for (const cls of allClasses) {
+        const results = await processClass(cls.id, weekStart, weekEnd);
+        allResults.push(...results);
+      }
+    } else {
+      allResults.push('no classes found');
+    }
+  }
+
+  return new Response(JSON.stringify({ weekStart, weekEnd, results: allResults }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 });

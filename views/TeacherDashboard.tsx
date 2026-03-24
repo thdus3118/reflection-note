@@ -19,7 +19,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
   };
   const today = getKoreanDate();
   
-  const [activeTab, setActiveTab] = useState<'analysis' | 'students' | 'classes' | 'settings'>(user.isFirstLogin ? 'settings' : 'analysis');
+  const [activeTab, setActiveTab] = useState<'analysis' | 'history' | 'students' | 'classes' | 'settings'>(user.isFirstLogin ? 'settings' : 'analysis');
   const [reflections, setReflections] = useState<Reflection[]>([]);
   const [students, setStudents] = useState<User[]>([]);
   const [classes, setClasses] = useState<ClassInfo[]>([]);
@@ -31,7 +31,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
   const [analysis, setAnalysis] = useState<any>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(today);
+  const [analysisDateInput, setAnalysisDateInput] = useState<string>(today);
   const [analysisHistory, setAnalysisHistory] = useState<Array<{date: string, data: any}>>([]);
+  const [historySelectedItem, setHistorySelectedItem] = useState<{date: string, data: any} | null>(null);
   
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
   const [selectedStudent, setSelectedStudent] = useState<User | null>(null);
@@ -65,7 +67,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
 
 
   useEffect(() => {
-    if (activeTab === 'analysis' && selectedClassId !== 'all') {
+    if ((activeTab === 'analysis' || activeTab === 'history') && selectedClassId !== 'all') {
       (async () => {
         const allAnalyses = await DB.getAnalyses();
         const prefix = `${selectedClassId}_`;
@@ -399,7 +401,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
           </div>
         </div>
         <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
-          {[ { id: 'analysis', label: 'AI 분석', icon: '📊' }, { id: 'students', label: '학생 관리', icon: '🧑‍🎓' }, { id: 'classes', label: '학급 설정', icon: '🏫' }, { id: 'settings', label: '개인 설정', icon: '⚙️' } ].map(tab => (
+          {[ { id: 'analysis', label: 'AI 분석', icon: '📊' }, { id: 'history', label: '분석 기록', icon: '📋' }, { id: 'students', label: '학생 관리', icon: '🧑‍🎓' }, { id: 'classes', label: '학급 설정', icon: '🏫' }, { id: 'settings', label: '개인 설정', icon: '⚙️' } ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-black transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
               <span>{tab.icon}</span> {tab.label}
             </button>
@@ -424,22 +426,32 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
                   <h3 className="font-black text-slate-800 text-2xl">{selectedClassId === 'all' ? '학급을 선택해주세요' : `${classes.find(c => c.id === selectedClassId)?.name} AI 가이드`}</h3>
                   <p className="text-sm text-slate-400 font-bold">학습 부진, 관계 갈등, 정서적 이상 징후를 집중적으로 분석합니다.</p>
                 </div>
-                <button onClick={() => runAnalysis(today)} disabled={isAnalyzing || selectedClassId === 'all' || !hasApiKey} className="bg-indigo-600 text-white px-12 py-5 rounded-2xl font-black hover:bg-indigo-700 disabled:bg-slate-200 transition-all shadow-xl shadow-indigo-100 whitespace-nowrap">
-                  {isAnalyzing ? "Gemini가 분석 중..." : "오늘의 학급 분석 시작"}
-                </button>
-                <button onClick={() => handleGenerateWeeklyFeedback(selectedClassId)} disabled={isGeneratingWeekly || selectedClassId === 'all' || !hasApiKey} className="bg-purple-600 text-white px-8 py-5 rounded-2xl font-black hover:bg-purple-700 disabled:bg-slate-200 transition-all shadow-xl shadow-purple-100 whitespace-nowrap">
-                  {isGeneratingWeekly ? '생성 중...' : '한 주 요약 피드백 생성'}
-                </button>
-              </div>
-              {analysisHistory.length > 0 && (
-                <div className="flex items-center gap-3 pt-4 border-t">
-                  <label className="text-xs font-black text-slate-400">📅 분석 이력 조회:</label>
-                  <select value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl border-none outline-none cursor-pointer">
-                    {analysisHistory.map(h => <option key={h.date} value={h.date}>{h.date} {h.date === today ? '(오늘)' : ''}</option>)}
-                  </select>
-                  <span className="text-xs text-slate-400 font-bold">총 {analysisHistory.length}일 분석됨</span>
+                <div className="flex flex-wrap gap-3">
+                  <button onClick={() => runAnalysis(today)} disabled={isAnalyzing || selectedClassId === 'all' || !hasApiKey} className="bg-indigo-600 text-white px-8 py-5 rounded-2xl font-black hover:bg-indigo-700 disabled:bg-slate-200 transition-all shadow-xl shadow-indigo-100 whitespace-nowrap">
+                    {isAnalyzing ? "Gemini가 분석 중..." : "오늘의 학급 분석"}
+                  </button>
+                  <button onClick={() => handleGenerateWeeklyFeedback(selectedClassId)} disabled={isGeneratingWeekly || selectedClassId === 'all' || !hasApiKey} className="bg-purple-600 text-white px-8 py-5 rounded-2xl font-black hover:bg-purple-700 disabled:bg-slate-200 transition-all shadow-xl shadow-purple-100 whitespace-nowrap">
+                    {isGeneratingWeekly ? '생성 중...' : '한 주 요약 피드백 생성'}
+                  </button>
                 </div>
-              )}
+              </div>
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4 pt-4 border-t">
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-black text-slate-400">📅 날짜 지정 분석:</label>
+                  <input type="date" value={analysisDateInput} onChange={(e) => setAnalysisDateInput(e.target.value)} max={today} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl border-none outline-none cursor-pointer" />
+                  <button onClick={() => runAnalysis(analysisDateInput)} disabled={isAnalyzing || selectedClassId === 'all' || !hasApiKey || !analysisDateInput} className="bg-slate-800 text-white px-6 py-2 rounded-xl text-xs font-black hover:bg-black disabled:bg-slate-200 transition-all whitespace-nowrap">
+                    {isAnalyzing ? '분석 중...' : '해당 날짜 분석 실행'}
+                  </button>
+                </div>
+                {analysisHistory.length > 0 && (
+                  <div className="flex items-center gap-3">
+                    <select value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl border-none outline-none cursor-pointer">
+                      {analysisHistory.map(h => <option key={h.date} value={h.date}>{h.date} {h.date === today ? '(오늘)' : ''}</option>)}
+                    </select>
+                    <span className="text-xs text-slate-400 font-bold">총 {analysisHistory.length}일 분석됨</span>
+                  </div>
+                )}
+              </div>
            </div>
            {selectedClassId !== 'all' && getWeeklyStats() && (
              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-8 rounded-[2.5rem] border border-indigo-100 shadow-sm">
@@ -529,6 +541,61 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
                 </div>
              </div>
            )}
+        </div>
+      )}
+
+      {activeTab === 'history' && (
+        <div className="space-y-6 animate-in slide-in-from-bottom-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="space-y-1">
+              <h3 className="font-black text-slate-800 text-2xl">📋 학급 분석 기록</h3>
+              <p className="text-sm text-slate-400 font-bold">{selectedClassId === 'all' ? '학급을 먼저 선택해주세요.' : `${classes.find(c => c.id === selectedClassId)?.name}의 누적 분석 기록입니다.`}</p>
+            </div>
+          </div>
+          {selectedClassId === 'all' ? (
+            <div className="py-24 text-center font-black text-slate-200 text-2xl border-4 border-dashed rounded-[3rem]">학급을 선택해주세요</div>
+          ) : analysisHistory.length === 0 ? (
+            <div className="py-24 text-center font-black text-slate-200 text-2xl border-4 border-dashed rounded-[3rem]">분석 기록이 없습니다</div>
+          ) : (
+            <div className="grid gap-4">
+              {analysisHistory.map(h => (
+                <div key={h.date} className={`bg-white p-8 rounded-[2rem] border-2 shadow-sm space-y-4 cursor-pointer transition-all hover:scale-[1.005] ${historySelectedItem?.date === h.date ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-200'}`} onClick={() => setHistorySelectedItem(historySelectedItem?.date === h.date ? null : h)}>
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="flex items-center gap-4">
+                      <span className={`px-4 py-2 rounded-xl text-xs font-black ${h.date === today ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{h.date} {h.date === today ? '(오늘)' : ''}</span>
+                      <span className="text-sm font-bold text-slate-500">평균 만족도 <span className="text-amber-500 font-black">{h.data.statistics?.averageRating?.toFixed(1) || '-'}</span></span>
+                      <span className="text-sm font-bold text-slate-500">경고 <span className="text-rose-500 font-black">{h.data.statistics?.alertCount || 0}건</span></span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteAnalysis(h.date); }} className="text-[10px] font-black text-rose-500 bg-rose-50 px-4 py-2 rounded-xl hover:bg-rose-100 transition-colors">삭제</button>
+                    </div>
+                  </div>
+                  <p className="text-sm font-bold text-slate-600 leading-relaxed line-clamp-2">{h.data.summary}</p>
+                  {historySelectedItem?.date === h.date && (
+                    <div className="space-y-6 pt-4 border-t border-slate-100 animate-in slide-in-from-top-2">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-slate-50 p-4 rounded-2xl"><div className="text-[10px] font-black text-slate-400 uppercase">평균 만족도</div><div className="text-2xl font-black text-amber-500 mt-1">{h.data.statistics?.averageRating?.toFixed(1) || '-'} <span className="text-sm text-slate-300">/ 5.0</span></div></div>
+                        <div className="bg-slate-50 p-4 rounded-2xl"><div className="text-[10px] font-black text-slate-400 uppercase">긍정 성찰</div><div className="text-2xl font-black text-emerald-500 mt-1">{h.data.statistics?.positiveCount || 0}명</div></div>
+                        <div className="bg-rose-50 p-4 rounded-2xl"><div className="text-[10px] font-black text-rose-400 uppercase">집중 지도 권고</div><div className="text-2xl font-black text-rose-600 mt-1">{h.data.statistics?.alertCount || 0}건</div></div>
+                      </div>
+                      <div className="bg-slate-50 p-6 rounded-2xl"><label className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mb-2 block">학급 브리핑</label><p className="text-slate-700 leading-relaxed font-bold">{h.data.summary}</p></div>
+                      {h.data.detectedIssues?.length > 0 && (
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] block">지도 필요 학생</label>
+                          {h.data.detectedIssues.map((issue: any, i: number) => (
+                            <div key={i} className="bg-slate-50 p-4 rounded-xl flex flex-col md:flex-row gap-4">
+                              <div className="flex items-center gap-2"><span className={`px-2 py-1 rounded-full text-[10px] font-black ${issue.severity === 'high' ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-600'}`}>{issue.issueType}</span><span className="font-black text-slate-700">{issue.studentName}</span></div>
+                              <p className="text-xs font-bold text-slate-500 flex-1">{issue.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
