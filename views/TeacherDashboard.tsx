@@ -273,14 +273,18 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onUpdateUser 
   const getWeekRange = () => {
     const now = new Date();
     const day = now.getDay();
+    // 이번 주 월요일 계산
     const diffToMonday = day === 0 ? -6 : 1 - day;
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diffToMonday);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
+    const thisMonday = new Date(now);
+    thisMonday.setDate(now.getDate() + diffToMonday);
+    // 지난 주 월요일 = 이번 주 월요일 - 7일
+    const lastMonday = new Date(thisMonday);
+    lastMonday.setDate(thisMonday.getDate() - 7);
+    const lastSunday = new Date(lastMonday);
+    lastSunday.setDate(lastMonday.getDate() + 6);
     return {
-      weekStart: monday.toISOString().split('T')[0],
-      weekEnd: sunday.toISOString().split('T')[0]
+      weekStart: lastMonday.toISOString().split('T')[0],
+      weekEnd: lastSunday.toISOString().split('T')[0]
     };
   };
 
